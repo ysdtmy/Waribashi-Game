@@ -1,8 +1,9 @@
 import itertools
 import random
+import copy
 
 
-class WaribashiGame:
+class WaribashiGame():
     def __init__(self, player_n=2):
         assert player_n == 2, "Over the number of player"
         self.win_reward = 1.
@@ -13,10 +14,6 @@ class WaribashiGame:
         self.render_field = [[1, 1] for p in range(self.player_n)]
 
     def render(self):
-        #         print("============")
-        #         print('player' +str(self.turn) +"'s turn")
-        #         print("============")
-        #         print()
         print('***player1***')
         print('  R               L')
         print('  ' + str(self.render_field[1][0]) + '               ' + str(self.render_field[1][1]) + '  ')
@@ -26,6 +23,7 @@ class WaribashiGame:
         print('***player0***')
 
     def reset(self, vervose=True):
+        self.turn = 0
         self.render_field = [[1, 1] for p in range(self.player_n)]
         if vervose:
             return self.render()
@@ -33,13 +31,11 @@ class WaribashiGame:
     def is_dead(self, checkedplayer):
         winner = None
         is_dead = False
-        reward = 0
         checked_filed = self.render_field[checkedplayer]
         if max(checked_filed) == 0:
             is_dead = True
             winner = self.get_enemy(checkedplayer)
-            print('player' + str(winner) + ' is win!!!!!')
-            reward = self.lose_reward
+            print('player' + str(winner) + ' wins!!!!!')
 
         return is_dead, winner
 
@@ -66,16 +62,18 @@ class WaribashiGame:
             , 5: (1, 0)
         }
 
-        reward = 0
-
         def attack(player, action):
             attack_from = player
             attack_to = self.get_enemy(player)
+            
             if action >= 4:
                 attack_to = player
+
             attack_direction = code2attack[action]
-            self.render_field[attack_to][attack_direction[1]] = self.render_field[attack_from][attack_direction[0]] + \
-                                                                self.render_field[attack_to][attack_direction[1]]
+            self.render_field[attack_to][attack_direction[1]] = self.render_field[attack_from][attack_direction[0]] +  self.render_field[attack_to][attack_direction[1]]
+
+
+            
             return True
 
         def splits(player, action):
@@ -85,9 +83,11 @@ class WaribashiGame:
             myfield = [splitted_val if val == alive_val else val for val in myfield]
             myfield = [abs(action) if val == 0 else val for val in myfield]
             self.render_field[player] = myfield
+            
 
         if action >= 0:
             attack(player, action)
+
 
         else:
             splits(player, action)
@@ -98,7 +98,7 @@ class WaribashiGame:
                 if self.render_field[i][j] >= 5:
                     self.render_field[i][j] = 0
 
-        is_dead, winner = self.is_dead(self.get_enemy(player))
+        is_dead,winner = self.is_dead(self.get_enemy(player))
 
         if vervose:
             print('player' + str(player) + '  ' + 'action is ' + str(action))
@@ -107,16 +107,13 @@ class WaribashiGame:
 
         self.turn = self.get_enemy(player)
 
-        if is_dead:
-            reward = self.win_reward
-
         return is_dead
 
     def chage_turn(self):
         pass
 
     def get_player_field(self, player):
-        player_filed = self.render_field.copy()
+        player_filed = copy.deepcopy(self.render_field)
         player_filed.insert(0, player_filed[player])
         del player_filed[player + 1]
         return player_filed
@@ -140,12 +137,12 @@ class WaribashiGame:
         legal_actions = []
 
         if field == None:
-            player_field = self.get_player_field(player)
+            p_field = self.get_player_field(player)
         else:
-            player_field = field
+            p_field = field
 
-        myfield = player_field[0]
-        enfield = player_field[1]
+        myfield = p_field[0]
+        enfield = p_field[1]
 
         my_alivehand = get_alivehand(myfield)
         en_alivehand = get_alivehand(enfield)
@@ -211,6 +208,8 @@ class Q_agent():
         for action in actions:
             q_val = self.get_qval(state, action, Qtable)
             q_val_dic[action] = q_val
+        
+        
 
         best_action = {}
         for k, v in q_val_dic.items():
@@ -224,18 +223,16 @@ class Q_agent():
         return best_action, best_qval
 
     def mover(self, state, actions, Qtable):
-        print(str(self.prev_state) + '=' + str(state))
-        self.prev_state = state
+        self.prev_state = copy.deepcopy(state)
         prob = random.random()
         is_greedy = prob > self.epsilon
         if is_greedy:
             action = random.choice(actions)
         else:
             action, _ = self.get_bestaction(state, actions, Qtable)
-        print('UPDATE' + str(self.player))
+        # print('UPDATE' + str(self.player))
         self.prev_action = action
         self.last_move = action
-        #         print('PLAYER' + str(self.player) + '  prev' + str(self.prev_state))
         return action
 
     def reward(self, reward, field, legal_actions, Qtable):
@@ -244,8 +241,6 @@ class Q_agent():
         return Qtable
 
     def update(self, prev_state, prev_action, reward, resultstate, legal_actions, Qtable):
-        #         print(str(self.player) + '    ' + str(self.prev_state))
-        print('update func UPDATE PLAYER' + str(self.player) + '  prev' + str(self.prev_state))
         pQ = self.get_qval(prev_state, prev_action, Qtable)
 
         if legal_actions == None:
@@ -256,12 +251,12 @@ class Q_agent():
 
         new_qval = pQ + self.alpha * ((reward + self.gamma * maxnewpQ) - pQ)
         Qtable[((prev_state[0][0], prev_state[0][1], prev_state[1][0], prev_state[1][1]), prev_action)] = new_qval
-        #         print('updDDD:'+str(((prev_state[0][0],prev_state[0][1],prev_state[1][0],prev_state[1][1]), prev_action)))
         return Qtable
 
 
 class GameMaster():
-    def __init__(self, env, p0, p1, iter_num=100, **kwargs):
+    def __init__(self, env, p0, p1, iter_num=100, t_max = 300 , **kwargs):
+        self.t_max = t_max
         self.p0 = p0
         self.p1 = p1
         self.env = env
@@ -274,40 +269,38 @@ class GameMaster():
             self.env.reset()
             self.p0.start_game()
             self.p1.start_game()
-            thisturn = None
-            notturn = None
-            while True:
-                del thisturn
-                del notturn
+            self.thisturn = None
+            self.notturn = None
+            for i in range(self.t_max):
+                print('==STEP' + str(i) + '==')
                 if self.env.turn == 0:
-                    thisturn = p0
-                    notturn = p1
+                    self.thisturn = self.p0
+                    self.notturn = self.p1
                 else:
-                    thisturn = p1
-                    notturn = p0
+                    self.thisturn = self.p1
+                    self.notturn = self.p0
 
-                turn_playerfield = self.env.get_player_field(env.turn)
-                notturn_playerfield = self.env.get_player_field(env.get_enemy(env.turn))
+                self.turn_playerfield = self.env.get_player_field(self.env.turn)            
+                self.notturn_playerfield = self.env.get_player_field(self.env.get_enemy(self.env.turn))
 
-                legal_actions = self.env.get_legal_action(env.turn)
-                print('turnf' + str(turn_playerfield))
-                action = thisturn.mover(turn_playerfield, legal_actions, self.Qtable)
-                print('PLAYER' + str(thisturn.player) + '  prev' + str(thisturn.prev_state))
-                print('PLAYER' + str(notturn.player) + '  prev' + str(notturn.prev_state))
+                legal_actions = self.env.get_legal_action(self.env.turn)
+                action = self.thisturn.mover(self.turn_playerfield, legal_actions, self.Qtable)
                 is_dead = self.env.step(self.env.turn, action)
 
-                new_turn_playerfield = self.env.get_player_field(self.env.turn)
-                new_notturn_playerfield = self.env.get_player_field(self.env.get_enemy(env.turn))
+
 
                 if is_dead:
                     legal_actions = []
-                    Qtable = thisturn.reward(env.win_reward, new_turn_playerfield, legal_actions, Qtable=self.Qtable)
-                    Qtable = notturn.reward(env.lose_reward, new_notturn_playerfield, legal_actions, Qtable=self.Qtable)
+                    self.new_notturn_playerfield = self.env.get_player_field(self.env.get_enemy(self.env.turn))
+                    self.new_turn_playerfield = self.env.get_player_field(self.env.turn)
+                    Qtable = self.thisturn.reward(self.env.win_reward, self.new_turn_playerfield, legal_actions, Qtable=self.Qtable)
+                    Qtable = self.notturn.reward(self.env.lose_reward, self.new_notturn_playerfield, legal_actions, Qtable=self.Qtable)
                     break
 
                 else:
-                    legal_actions = self.env.get_legal_action(env.get_enemy(env.turn))
-                    Qtable = notturn.reward(env.non_reward, new_notturn_playerfield, legal_actions, Qtable=self.Qtable)
+                    self.new_notturn_playerfield = self.env.get_player_field(self.env.get_enemy(self.env.turn))
+                    legal_actions = self.env.get_legal_action(self.env.get_enemy(self.env.turn))
+                    Qtable = self.notturn.reward(self.env.non_reward, self.new_notturn_playerfield, legal_actions, Qtable=self.Qtable)
 
 
 if __name__ == "__main__":
