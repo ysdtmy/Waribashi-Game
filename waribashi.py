@@ -112,7 +112,7 @@ class WaribashiGame():
 
         self.turn = self.get_enemy(player)
 
-        return is_dead
+        return is_dead,winner
 
     def chage_turn(self):
         pass
@@ -301,7 +301,7 @@ class Q_agent(agent):
         return action
 
     def reward(self, reward, field, legal_actions, Qtable):
-        if self.last_move:
+        if self.last_move != None:
             Qtable = self.update(self.prev_state, self.prev_action, reward, field, legal_actions, Qtable)
         return Qtable
 
@@ -316,6 +316,7 @@ class Q_agent(agent):
 
         new_qval = pQ + self.alpha * ((reward + self.gamma * maxnewpQ) - pQ)
         Qtable[((prev_state[0][0], prev_state[0][1], prev_state[1][0], prev_state[1][1]), prev_action)] = new_qval
+        # print(str([((prev_state[0][0], prev_state[0][1], prev_state[1][0], prev_state[1][1]), prev_action)]) + '=' + str(new_qval))
         return Qtable
 
 
@@ -359,9 +360,7 @@ class GameMaster():
 
                 legal_actions = self.env.get_legal_action(self.env.turn)
                 action = self.thisturn.mover(self.turn_playerfield, legal_actions, self.Qtable, silent = _silent)
-                is_dead = self.env.step(self.env.turn, action,silent=_silent)
-
-
+                is_dead, _ = self.env.step(self.env.turn, action,silent=_silent)
 
                 if is_dead:
                     legal_actions = []
@@ -407,10 +406,10 @@ class GameMaster():
 
                 legal_actions = self.env.get_legal_action(self.env.turn)
                 action = self.thisturn.mover(self.turn_playerfield, legal_actions, self.Qtable, silent = _silent)
-                is_dead = self.env.step(self.env.turn, action, silent = _silent)
+                is_dead,winner = self.env.step(self.env.turn, action, silent = _silent)
                 
                 if is_dead:
-                    win_dict[self.env.turn] = win_dict[self.env.turn] + 1
+                    win_dict[winner] = win_dict[winner] + 1
                     break
                 
                 if t == t_max -1:
